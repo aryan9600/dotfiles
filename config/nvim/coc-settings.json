@@ -1,0 +1,16 @@
+{
+    "coc.preferences.jumpCommand": "tab drop",
+    "python.venvPath": "/Users/sanskarjaiswal/.virtualenvs/",
+    "python.analysis.typeCheckingMode": "off",
+    "yaml.schemas": {
+        "kubernetes": "/*.yaml"
+    },
+    "languageserver": {
+        "bash": {
+            "command": "bash-language-server",
+            "args": ["start"],
+            "filetypes": ["sh"],
+            "ignoredRootPaths": ["~"]
+        }
+    }
+}
