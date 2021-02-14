@@ -15,12 +15,15 @@ Plug 'jiangmiao/auto-pairs'
 Plug 'dart-lang/dart-vim-plugin'
 Plug 'vim-python/python-syntax'
 Plug 'APZelos/blamer.nvim'
+Plug 'frazrepo/vim-rainbow'
 call plug#end()
 
 " Gruvbox settings here
 let g:gruvbox_contrast_dark = "soft"
 autocmd vimenter * colorscheme gruvbox
+let g:rainbow_active = 1
 
+au TermOpen * setlocal nonumber norelativenumber
 " -------------------------------------------------------------------------------------------------
 " coc.nvim settings
 " -------------------------------------------------------------------------------------------------
@@ -52,10 +55,13 @@ function! s:show_documentation()
   endif
 endfunction
 
+command! -nargs=0 Prettier :CocCommand prettier.formatFile
+vmap <leader>f  <Plug>(coc-format-selected)
+nmap <leader>f  <Plug>(coc-format-selected)
 
 " Remap keys for gotos
 nmap <silent> gd <Plug>(coc-definition)
-nmap <sient> gy <Plug>(coc-type-definition)
+nmap <silent> gy <Plug>(coc-type-definition)
 nmap <silent> gi <Plug>(coc-implementation)
 nmap <silent> gr <Plug>(coc-references)
 nmap <silent> gt :call CocActionAsync('doQuickfix')<cr>
@@ -86,6 +92,7 @@ nnoremap <silent> <space>j  :<C-u>CocNext<CR>
 nnoremap <silent> <space>k  :<C-u>CocPrev<CR>
 " Resume latest coc list
 nnoremap <silent> <space>p  :<C-u>CocListResume<CR>
+nnoremap <silent> gf :GoDeclsDir<cr>
 
 " nvim settings
 let mapleader = " "
@@ -110,7 +117,7 @@ set shiftwidth=4
 set expandtab
 set smartindent
 set nu
-set nowrap
+set wrap
 set smartcase
 set noswapfile
 set nobackup
@@ -128,11 +135,18 @@ set background=dark
 "set timeoutlen=1000
 "set ttimeoutlen=0
 
+tnoremap <Esc> <C-\><C-n>
 " tab mappings
 nmap <silent> ti :tabr<cr>
 nmap <silent> tl :tabl<cr>
 nmap <silent> tp :tabp<cr>
 nmap <silent> tn :tabn<cr>
+" Switch to last-active tab
+if !exists('g:lasttab')
+  let g:lasttab = 1
+endif
+nmap <silent>to :exe "tabn ".g:lasttab<CR>
+au TabLeave * let g:lasttab = tabpagenr()
 " keybinding to unhighlight
 nmap <silent> cc :noh<cr>
 "split navigations
@@ -154,6 +168,8 @@ autocmd FileType python set sts=4
 let g:go_gopls_enabled = 0
 " disable vim-go :GoDef
 let g:go_def_mapping_enabled = 0
+" disable annoying af warning
+let g:go_version_warning = 0
 " Syntax highlighting for go
 let g:go_highlight_build_constraints = 1
 let g:go_highlight_extra_types = 1
@@ -168,7 +184,7 @@ let g:go_highlight_function_calls = 1
 let g:go_highlight_variable_assignments = 1
 
 " Lets me bulk comment using '<Leader>[space]'
-let s:comment_map = { 
+let s:comment_map = {
     \   "yml": '#',
     \   "yaml": '#',
     \   "c": '\/\/',
@@ -228,13 +244,15 @@ nnoremap <silent> <Leader>c  :Commits<CR>
 nnoremap <silent> <Leader>bc :BCommits<CR>
 let g:blamer_enabled = 1
 let g:blamer_delay = 500
+let g:blamer_show_in_visual_modes = 0
 
 " [[B]Commits] Customize the options used by 'git log':
 let g:fzf_commits_log_options = '--graph --color=always --format="%C(auto)%h%d %s %C(black)%C(bold)%cr"'
-command! -bang -nargs=* Find call fzf#vim#grep('rg --column --line-number --no-heading --fixed-strings --ignore-case --no-ignore --hidden --follow --glob "!.git/*" --glob "!*.pyc" --glob "!.idea/*" --glob "!*.log" --color "always" '.shellescape(<q-args>), 1, <bang>0)
+command! -bang -nargs=* Find call fzf#vim#grep('rg --column --line-number --no-heading --fixed-strings --ignore-case --no-ignore --hidden --follow --glob "!.git/*" --glob "!*.pyc" --glob "!vendor/*" --glob "!target/*" --glob "!.idea/*" --glob "!*.log" --color "always" '.shellescape(<q-args>), 1, <bang>0)
 " fzf mappings
 nnoremap <silent> <C-f> :Files<CR>
 nnoremap <silent> <C-a> :Rg<CR>
+set rtp+=/usr/local/opt/fzf
 
 " air-line
 let g:airline_powerline_fonts = 1
@@ -249,25 +267,25 @@ let g:airline_section_x = 0
 let g:airline_section_y = 0
 let g:airline#extensions#virtualenv#enabled = 1
 " unicode symbols
-let g:airline_left_sep = '»'
-let g:airline_left_sep = '▶'
-let g:airline_right_sep = '«'
-let g:airline_right_sep = '◀'
-let g:airline_symbols.linenr = '␊'
-let g:airline_symbols.linenr = '␤'
-let g:airline_symbols.linenr = '¶'
-let g:airline_symbols.branch = '⎇'
-let g:airline_symbols.paste = 'ρ'
-let g:airline_symbols.paste = 'Þ'
-let g:airline_symbols.paste = '∥'
-let g:airline_symbols.whitespace = 'Ξ'
+let g:airline_left_sep = '¬ª'
+let g:airline_left_sep = '‚ñ∂'
+let g:airline_right_sep = '¬´'
+let g:airline_right_sep = '‚óÄ'
+let g:airline_symbols.linenr = '‚êä'
+let g:airline_symbols.linenr = '‚ê§'
+let g:airline_symbols.linenr = '¬∂'
+let g:airline_symbols.branch = '‚éá'
+let g:airline_symbols.paste = 'œÅ'
+let g:airline_symbols.paste = '√û'
+let g:airline_symbols.paste = '‚à•'
+let g:airline_symbols.whitespace = 'Œû'
 
 " airline symbols
-let g:airline_left_sep = ''
-let g:airline_left_alt_sep = ''
-let g:airline_right_sep = ''
-let g:airline_right_alt_sep = ''
-let g:airline_symbols.branch = ''
-let g:airline_symbols.readonly = ''
-let g:airline_symbols.linenr = ''
+let g:airline_left_sep = 'ÓÇ∞'
+let g:airline_left_alt_sep = 'ÓÇ±'
+let g:airline_right_sep = 'ÓÇ≤'
+let g:airline_right_alt_sep = 'ÓÇ≥'
+let g:airline_symbols.branch = 'ÓÇ†'
+let g:airline_symbols.readonly = 'ÓÇ¢'
+let g:airline_symbols.linenr = 'ÓÇ°'
 set t_Co=256
