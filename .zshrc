@@ -11,13 +11,20 @@ export PATH=$PATH:/Users/sanskarjaiswal/softwares/clangd_10.0.0/bin
 export PATH=$PATH:/usr/local/mysql/bin
 export PATH=$PATH:/Users/sanskarjaiswal/softwares/prometheus
 export PATH=$PATH:/Users/sanskarjaiswal/softwares/node_exporter
+export PATH=$PATH:/Users/sanskarjaiswal/softwares/ngrok
 export PATH=$PATH:/Users/sanskarjaiswal/softwares/go/bin
 export PATH=/Applications/Postgres.app/Contents/Versions/latest/bin/:$PATH
-
+export PATH=$PATH:/usr/local/sbin
+alias gcc='gcc-10'
+alias cc='gcc-10'
+export CC=gcc-10
+export CXX=g++-10
+export CC=/usr/local/bin/gcc-10
 export GOPATH=/Users/sanskarjaiswal/Development/go
+export HOMEBREW_NO_AUTO_UPDATE=1
 
 # fzf stuff
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow --glob "!.git/*" --glob "!.idea/*" --glob "!*.pyc" --glob "!*.log"'
+export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow --glob "!.git/*" --glob "!vendor/*" --glob "!target/*" --glob "!.idea/*" --glob "!*.pyc" --glob "!*.log"'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 
 # Set name of the theme to load --- if set to "random", it will
@@ -27,6 +34,13 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 ZSH_THEME="powerlevel10k/powerlevel10k"
 POWERLEVEL9K_MODE="awesome-patched"
 export BAT_THEME="ansi-dark"
+# GitHub CLI editor
+export EDITOR=vim
+
+# Syntax highlighting for less
+LESSPIPE=`which src-hilite-lesspipe.sh`
+export LESSOPEN="| ${LESSPIPE} %s"
+export LESS=' -R -X -F '
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -128,3 +142,9 @@ if [ -f '/Users/sanskarjaiswal/softwares/google-cloud-sdk/path.zsh.inc' ]; then 
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/Users/sanskarjaiswal/softwares/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/sanskarjaiswal/softwares/google-cloud-sdk/completion.zsh.inc'; fi
+export PATH="/Users/sanskarjaiswal/.deta/bin:$PATH"
+
+# Wasmer
+export WASMER_DIR="/Users/sanskarjaiswal/.wasmer"
+[ -s "$WASMER_DIR/wasmer.sh" ] && source "$WASMER_DIR/wasmer.sh"
+export PATH="/usr/local/opt/bison/bin:$PATH"
