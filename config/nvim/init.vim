@@ -1,1 +1,0 @@
-/Users/sanskarjaiswal/.config/nvim/init.vim
