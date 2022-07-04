@@ -2,6 +2,7 @@ call plug#begin('~/.config/nvim')
 
 " Plugins
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'preservim/nerdcommenter'
 Plug 'morhetz/gruvbox'
 Plug 'tpope/vim-fugitive'
 Plug 'preservim/nerdtree'
@@ -9,19 +10,18 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
-Plug 'vim-syntastic/syntastic'
 Plug 'frazrepo/vim-rainbow'
 Plug 'jiangmiao/auto-pairs'
-Plug 'vim-python/python-syntax'
 Plug 'APZelos/blamer.nvim'
-Plug 'cespare/vim-toml'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
-Plug 'psf/black', { 'branch': 'stable' }
+Plug 'puremourning/vimspector'
 call plug#end()
 
 " Gruvbox settings here
 let g:gruvbox_contrast_dark = "soft"
+let g:gruvbox_transparent_bg = 1
 autocmd vimenter * colorscheme gruvbox
+" autocmd VimEnter * hi Normal ctermbg=none
 let g:rainbow_active = 1
 
 au TermOpen * setlocal nonumber norelativenumber
@@ -40,6 +40,26 @@ function! s:check_back_space() abort
   let col = col('.') - 1
   return !col || getline('.')[col - 1]  =~# '\s'
 endfunction
+
+" BG transparent settings in neovim ---------------------- {{{
+" let t:is_transparent = 0
+" function! Toggle_transparent_background()
+  " if t:is_transparent == 0
+    " hi Normal guibg=#111111 ctermbg=black
+    " let t:is_transparent = 1
+  " else
+    " hi Normal guibg=NONE ctermbg=NONE
+    " let t:is_transparent = 0
+  " endif
+" endfunction
+" nnoremap <space>tb :call Toggle_transparent_background()<CR>
+" }}}
+
+function! Toggle_bg()
+    source /Users/sanskarjaiswal/.config/nvim/init.vim
+    hi Normal guibg=none ctermbg=none
+endfunction
+nnoremap <space>tb :call Toggle_bg()<CR>
 
 "disable vim-go gopls
 let g:go_gopls_enabled = 0
@@ -229,8 +249,15 @@ function! ToggleComment()
     end
 endfunction
 
+filetype plugin on
+
+" Create default mappings
+let g:NERDCreateDefaultMappings = 1
+
 nnoremap <Leader><Space> :call ToggleComment()<cr>
 vnoremap <Leader><Space> :call ToggleComment()<cr>
+" nnoremap <Leader><Space> :call NERDComment()<cr>
+" vnoremap <Leader><Space> :call NERDComment()<cr>
 
 nnoremap <silent> q :<C-u>NERDTreeToggle<CR>
 
