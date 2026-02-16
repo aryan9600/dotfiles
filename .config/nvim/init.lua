@@ -33,5 +33,17 @@ vim.cmd("hi CursorLineNr cterm=NONE ctermbg=NONE ctermbg=NONE")
 vim.cmd("hi clear LineNr")
 vim.cmd("hi clear SignColumn")
 
+vim.opt.title = true
+vim.opt.titlestring = "nvim - %{fnamemodify(getcwd(), ':t')}"
+
 -- delete not copy to register (inaccurate; fails for multiple lines)
 vim.api.nvim_set_keymap('n', 'd', '"_d', { noremap = true })
+
+vim.api.nvim_create_user_command("LspStartWithEnv", function(opts)
+  vim.g.astronvim_lsp_env = {}
+  for _, arg in ipairs(vim.split(opts.args, " ")) do
+    local key, value = unpack(vim.split(arg, "=", { plain = true, trimempty = true }))
+    if key and value then vim.g.astronvim_lsp_env[key] = value end
+  end
+  vim.cmd "LspStart"
+end, { nargs = "*" })

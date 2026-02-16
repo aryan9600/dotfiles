@@ -425,6 +425,27 @@ function M.config(server_name)
     lsp_opts.settings = { Lua = { workspace = { checkThirdParty = false } } }
   end
   local opts = user_opts(server_config .. server_name, lsp_opts)
+
+  if vim.g.astronvim_lsp_env then
+    local env_string = ""
+    for k, v in pairs(vim.g.astronvim_lsp_env) do
+      env_string = env_string .. k .. "='" .. v .. "' "
+    end
+
+    local original_cmd_table = opts.cmd
+    if not original_cmd_table then
+      local server_config_ok, server_config_val = pcall(require, "lspconfig.server_configurations." .. server_name)
+      if server_config_ok and server_config_val.default_config and server_config_val.default_config.cmd then
+        original_cmd_table = server_config_val.default_config.cmd
+      end
+    end
+
+    if original_cmd_table then
+      local original_cmd = table.concat(original_cmd_table, " ")
+      opts.cmd = { "/bin/sh", "-c", env_string .. original_cmd }
+    end
+  end
+
   local old_on_attach = server.on_attach
   local user_on_attach = opts.on_attach
   opts.on_attach = function(client, bufnr)
