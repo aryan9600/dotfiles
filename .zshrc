@@ -71,7 +71,6 @@ fi
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-eval "$(pyenv init -)"
 
 # The next line updates PATH for the Google Cloud SDK.
 if [ -f '/Users/sanskarjaiswal/Development/softwares/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/sanskarjaiswal/Development/softwares/google-cloud-sdk/path.zsh.inc'; fi
