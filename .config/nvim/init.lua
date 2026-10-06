@@ -22,16 +22,8 @@ end
 
 require("astronvim.utils").conditional_func(astronvim.user_opts("polish", nil, false), true)
 
--- theme and transparent bg stuff
-vim.o.background = "dark" -- or "light" for light mode
-vim.cmd([[colorscheme gruvbox]])
-
-vim.cmd("hi Normal guibg=NONE ctermbg=NONE")
-vim.cmd("hi CursorColumn cterm=NONE ctermbg=NONE ctermfg=NONE")
-vim.cmd("hi CursorLine cterm=NONE ctermbg=NONE ctermfg=NONE")
-vim.cmd("hi CursorLineNr cterm=NONE ctermbg=NONE ctermbg=NONE")
-vim.cmd("hi clear LineNr")
-vim.cmd("hi clear SignColumn")
+-- theme and transparent bg is driven by lua/plugins/auto-dark-mode.lua, which
+-- follows the macOS system appearance
 
 vim.opt.title = true
 vim.opt.titlestring = "nvim - %{fnamemodify(getcwd(), ':t')}"
