@@ -1,41 +1,26 @@
+-- nvim-treesitter `main` branch (the only branch that supports Neovim 0.12). It no longer has a module system,
+-- so highlight/indent/textobjects/incremental selection are attached per buffer in
+-- lua/plugins/configs/nvim-treesitter.lua with the same keymaps the old `configs.setup` produced.
 return {
-  "nvim-treesitter/nvim-treesitter",
-  dependencies = {
-    "JoosepAlviste/nvim-ts-context-commentstring",
-    "nvim-treesitter/nvim-treesitter-textobjects",
-    -- HACK: remove when https://github.com/windwp/nvim-ts-autotag/issues/125 closed.
-    { "windwp/nvim-ts-autotag", opts = { autotag = { enable_close_on_slash = false } } },
-  },
-  event = "User AstroFile",
-  cmd = {
-    "TSBufDisable",
-    "TSBufEnable",
-    "TSBufToggle",
-    "TSDisable",
-    "TSEnable",
-    "TSToggle",
-    "TSInstall",
-    "TSInstallInfo",
-    "TSInstallSync",
-    "TSModuleInfo",
-    "TSUninstall",
-    "TSUpdate",
-    "TSUpdateSync",
-  },
-  build = ":TSUpdate",
-  opts = function()
-    return {
-      autotag = { enable = true },
-      context_commentstring = { enable = true, enable_autocmd = false },
-      highlight = {
-        enable = true,
-        disable = function(_, bufnr) return vim.b[bufnr].large_buf end,
+  {
+    "nvim-treesitter/nvim-treesitter",
+    branch = "main",
+    lazy = false, -- the main branch does not support lazy loading
+    build = ":TSUpdate",
+    dependencies = {
+      { "nvim-treesitter/nvim-treesitter-textobjects", branch = "main" },
+    },
+    opts = {
+      -- parsers to keep installed. Neovim bundles the non-rust ones, but installing them through nvim-treesitter also
+      -- installs their indent queries (which the old master branch shipped for every language)
+      ensure_installed = { "c", "lua", "markdown", "markdown_inline", "query", "rust", "vim", "vimdoc" },
+      highlight = { disable = function(_, bufnr) return vim.b[bufnr].large_buf end },
+      indent = true,
+      incremental_selection = {
+        keymaps = { init_selection = "gnn", node_incremental = "grn", scope_incremental = "grc", node_decremental = "grm" },
       },
-      incremental_selection = { enable = true },
-      indent = { enable = true },
       textobjects = {
         select = {
-          enable = true,
           lookahead = true,
           keymaps = {
             ["ak"] = { query = "@block.outer", desc = "around block" },
@@ -53,7 +38,6 @@ return {
           },
         },
         move = {
-          enable = true,
           set_jumps = true,
           goto_next_start = {
             ["]k"] = { query = "@block.outer", desc = "Next block start" },
@@ -77,7 +61,6 @@ return {
           },
         },
         swap = {
-          enable = true,
           swap_next = {
             [">K"] = { query = "@block.outer", desc = "Swap next block" },
             [">F"] = { query = "@function.outer", desc = "Swap next function" },
@@ -90,7 +73,17 @@ return {
           },
         },
       },
-    }
-  end,
-  config = require "plugins.configs.nvim-treesitter",
+    },
+    config = require "plugins.configs.nvim-treesitter",
+  },
+  {
+    "JoosepAlviste/nvim-ts-context-commentstring",
+    lazy = true,
+    opts = { enable_autocmd = false },
+  },
+  {
+    "windwp/nvim-ts-autotag",
+    event = "User AstroFile",
+    opts = { opts = { enable_close = true, enable_rename = true, enable_close_on_slash = false } },
+  },
 }

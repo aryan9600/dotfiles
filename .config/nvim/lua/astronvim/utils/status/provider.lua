@@ -17,7 +17,7 @@ local status_utils = require "astronvim.utils.status.utils"
 local utils = require "astronvim.utils"
 local extend_tbl = utils.extend_tbl
 local get_icon = utils.get_icon
-local luv = vim.uv or vim.loop -- TODO: REMOVE WHEN DROPPING SUPPORT FOR Neovim v0.9
+local luv = vim.uv
 
 --- A provider function for the fill string
 ---@return string # the statusline string for filling the empty space
@@ -483,7 +483,7 @@ function M.lsp_client_names(opts)
   opts = extend_tbl({ expand_null_ls = true, truncate = 0.25 }, opts)
   return function(self)
     local buf_client_names = {}
-    for _, client in pairs(vim.lsp.get_active_clients { bufnr = self and self.bufnr or 0 }) do
+    for _, client in pairs(vim.lsp.get_clients { bufnr = self and self.bufnr or 0 }) do
       if client.name == "null-ls" and opts.expand_null_ls then
         local null_ls_sources = {}
         for _, type in ipairs { "FORMATTING", "DIAGNOSTICS" } do
@@ -511,7 +511,9 @@ end
 -- @usage local heirline_component = { provider = require("astronvim.utils.status").provider.treesitter_status() }
 -- @see astronvim.utils.status.utils.stylize
 function M.treesitter_status(opts)
-  return function() return status_utils.stylize(require("nvim-treesitter.parser").has_parser() and "TS" or "", opts) end
+  return function()
+    return status_utils.stylize(vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] and "TS" or "", opts)
+  end
 end
 
 --- A provider function for displaying a single string

@@ -94,9 +94,9 @@ function M.toggle_buffer_semantic_tokens(bufnr, silent)
   bufnr = bufnr or 0
   vim.b[bufnr].semantic_tokens_enabled = not vim.b[bufnr].semantic_tokens_enabled
   local toggled = false
-  for _, client in ipairs(vim.lsp.get_active_clients { bufnr = bufnr }) do
+  for _, client in ipairs(vim.lsp.get_clients { bufnr = bufnr }) do
     if client.server_capabilities.semanticTokensProvider then
-      vim.lsp.semantic_tokens[vim.b[bufnr].semantic_tokens_enabled and "start" or "stop"](bufnr, client.id)
+      vim.lsp.semantic_tokens.enable(vim.b[bufnr].semantic_tokens_enabled, { bufnr = bufnr, client_id = client.id })
       toggled = true
     end
   end
@@ -112,18 +112,15 @@ end
 function M.toggle_buffer_inlay_hints(bufnr, silent)
   bufnr = bufnr or 0
   vim.b[bufnr].inlay_hints_enabled = not vim.b[bufnr].inlay_hints_enabled
-  -- TODO: remove check after dropping support for Neovim v0.9
-  if vim.lsp.inlay_hint then
-    vim.lsp.inlay_hint(bufnr, vim.b[bufnr].inlay_hints_enabled)
-    ui_notify(silent, string.format("Inlay hints %s", bool2str(vim.b[bufnr].inlay_hints_enabled)))
-  end
+  vim.lsp.inlay_hint.enable(vim.b[bufnr].inlay_hints_enabled, { bufnr = bufnr })
+  ui_notify(silent, string.format("Inlay hints %s", bool2str(vim.b[bufnr].inlay_hints_enabled)))
 end
 
 --- Toggle codelens
 ---@param silent? boolean if true then don't sent a notification
 function M.toggle_codelens(silent)
   vim.g.codelens_enabled = not vim.g.codelens_enabled
-  if not vim.g.codelens_enabled then vim.lsp.codelens.clear() end
+  vim.lsp.codelens.enable(vim.g.codelens_enabled)
   ui_notify(silent, string.format("CodeLens %s", bool2str(vim.g.codelens_enabled)))
 end
 
@@ -235,13 +232,14 @@ end
 function M.toggle_buffer_syntax(bufnr, silent)
   -- HACK: this should just be `bufnr = bufnr or 0` but it looks like `vim.treesitter.stop` has a bug with `0` being current
   bufnr = (bufnr and bufnr ~= 0) and bufnr or vim.api.nvim_win_get_buf(0)
-  local ts_avail, parsers = pcall(require, "nvim-treesitter.parsers")
+  local lang = vim.treesitter.language.get_lang(vim.bo[bufnr].filetype)
+  local has_parser = lang and vim.treesitter.language.add(lang)
   if vim.bo[bufnr].syntax == "off" then
-    if ts_avail and parsers.has_parser() then vim.treesitter.start(bufnr) end
+    if has_parser then vim.treesitter.start(bufnr, lang) end
     vim.bo[bufnr].syntax = "on"
     if not vim.b[bufnr].semantic_tokens_enabled then M.toggle_buffer_semantic_tokens(bufnr, true) end
   else
-    if ts_avail and parsers.has_parser() then vim.treesitter.stop(bufnr) end
+    if has_parser then vim.treesitter.stop(bufnr) end
     vim.bo[bufnr].syntax = "off"
     if vim.b[bufnr].semantic_tokens_enabled then M.toggle_buffer_semantic_tokens(bufnr, true) end
   end

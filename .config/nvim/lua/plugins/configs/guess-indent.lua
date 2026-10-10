@@ -1,4 +1,5 @@
 return function(_, opts)
   require("guess-indent").setup(opts)
-  vim.cmd.lua { args = { "require('guess-indent').set_from_buffer('auto_cmd')" }, mods = { silent = true } }
+  -- guess the indent of the buffer that triggered loading (signature is now `set_from_buffer(bufnr, context, silent)`)
+  require("guess-indent").set_from_buffer(nil, "auto_cmd", true)
 end

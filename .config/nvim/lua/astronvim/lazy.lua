@@ -1,17 +1,17 @@
 local git_version = vim.fn.system { "git", "--version" }
 if vim.api.nvim_get_vvar "shell_error" ~= 0 then
-  vim.api.nvim_err_writeln("Git doesn't appear to be available...\n\n" .. git_version)
+  vim.notify("Git doesn't appear to be available...\n\n" .. git_version, vim.log.levels.ERROR)
 end
 local major, min, _ = unpack(vim.tbl_map(tonumber, vim.split(git_version:match "%d+%.%d+%.%d", "%.")))
 local modern_git = major > 2 or (major == 2 and min >= 19)
 
 local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
-if not (vim.uv or vim.loop).fs_stat(lazypath) then -- TODO: REMOVE vim.loop WHEN DROPPING SUPPORT FOR Neovim v0.9
+if not vim.uv.fs_stat(lazypath) then
   local clone = { "git", "clone", modern_git and "--filter=blob:none" or nil }
   local output =
     vim.fn.system(vim.list_extend(clone, { "--branch=stable", "https://github.com/folke/lazy.nvim.git", lazypath }))
   if vim.api.nvim_get_vvar "shell_error" ~= 0 then
-    vim.api.nvim_err_writeln("Error cloning lazy.nvim repository...\n\n" .. output)
+    vim.notify("Error cloning lazy.nvim repository...\n\n" .. output, vim.log.levels.ERROR)
   end
   local oldcmdheight = vim.opt.cmdheight:get()
   vim.opt.cmdheight = 1
@@ -45,6 +45,7 @@ require("lazy").setup(astronvim.user_opts("lazy", {
   defaults = { lazy = false },
   git = { filter = modern_git },
   install = { colorscheme = colorscheme },
+  rocks = { enabled = false }, -- no plugin here needs luarocks
   performance = {
     rtp = {
       paths = astronvim.supported_configs,

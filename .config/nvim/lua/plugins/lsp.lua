@@ -1,17 +1,11 @@
 return {
   "b0o/SchemaStore.nvim",
   {
-    "folke/neodev.nvim",
+    -- replaces the archived neodev.nvim: Neovim runtime/plugin types for lua_ls when editing the Neovim config
+    "folke/lazydev.nvim",
+    ft = "lua",
     opts = {
-      override = function(root_dir, library)
-        for _, astronvim_config in ipairs(astronvim.supported_configs) do
-          if root_dir:match(astronvim_config) then
-            library.plugins = true
-            break
-          end
-        end
-        vim.b.neodev_enabled = library.enabled
-      end,
+      library = { { path = "${3rd}/luv/library", words = { "vim%.uv" } } },
     },
   },
   {
@@ -40,12 +34,10 @@ return {
         end,
       },
       {
-        "williamboman/mason-lspconfig.nvim",
+        "mason-org/mason-lspconfig.nvim",
+        dependencies = { "mason-org/mason.nvim" },
         cmd = { "LspInstall", "LspUninstall" },
-        opts = function(_, opts)
-          if not opts.handlers then opts.handlers = {} end
-          opts.handlers[1] = function(server) require("astronvim.utils.lsp").setup(server) end
-        end,
+        opts = {},
         config = require "plugins.configs.mason-lspconfig",
       },
     },
@@ -56,7 +48,7 @@ return {
     config = require "plugins.configs.lspconfig",
   },
   {
-    "jose-elias-alvarez/null-ls.nvim",
+    "nvimtools/none-ls.nvim",
     dependencies = {
       {
         "jay-babu/mason-null-ls.nvim",
@@ -176,15 +168,16 @@ return {
       { "folke/snacks.nvim", opts = { input = {}, picker = {}, terminal = {} } },
     },
     config = function()
+      -- opencode.nvim v2 (needed for the OpenCode v2 CLI) removed the `provider` option and `toggle()`, so the
+      -- OpenCode TUI now runs in a snacks terminal managed here (same bottom/30% layout as the old snacks provider)
+      local opencode_cmd = "opencode"
+      ---@type snacks.terminal.Opts
+      local terminal_opts = { count = 1, win = { position = "bottom", height = 0.3, enter = false } }
+
       ---@type opencode.Opts
       vim.g.opencode_opts = {
-        provider = {
-          snacks = {
-            win = {
-              position = "bottom",
-              height = 0.3,
-            },
-          },
+        server = {
+          start = function() require("snacks.terminal").open(opencode_cmd, terminal_opts) end,
         },
       }
 
@@ -192,11 +185,11 @@ return {
       vim.o.autoread = true
 
       -- Recommended/example keymaps.
-      vim.keymap.set({ "n", "x" }, "<leader>ma", function() require("opencode").ask("@this: ", { submit = true }) end,
+      vim.keymap.set({ "n", "x" }, "<leader>ma", function() require("opencode").ask("@this: ") end,
         { desc = "Ask opencode" })
       vim.keymap.set({ "n", "x" }, "<leader>ms", function() require("opencode").select() end,
         { desc = "Execute opencode action…" })
-      vim.keymap.set({ "n", "t" }, "<leader>mm", function() require("opencode").toggle() end,
+      vim.keymap.set({ "n", "t" }, "<leader>mm", function() require("snacks.terminal").toggle(opencode_cmd, terminal_opts) end,
         { desc = "Toggle opencode" })
 
       vim.keymap.set({ "n", "x" }, "go", function() return require("opencode").operator("@this ") end,
@@ -209,16 +202,8 @@ return {
       vim.keymap.set("n", "<S-C-d>", function() require("opencode").command("session.half.page.down") end,
         { desc = "opencode half page down" })
 
-      -- Toggle opencode window orientation between bottom and right (plugin default).
-      -- `vim.g.opencode_opts` is baked into the provider at startup, so mutate the
-      -- live provider opts and terminal instance instead.
+      -- Toggle opencode window orientation between bottom and right.
       vim.api.nvim_create_user_command("OpencodeOrientation", function()
-        local provider = require("opencode.config").provider
-        if not provider then
-          vim.notify("opencode provider not available", vim.log.levels.WARN)
-          return
-        end
-
         local function flip(o)
           if (o.position or "right") == "bottom" then
             o.position, o.height, o.width = "right", nil, 0.4
@@ -228,11 +213,10 @@ return {
         end
 
         -- opts used when the terminal is created fresh
-        provider.opts.win = provider.opts.win or {}
-        flip(provider.opts.win)
+        flip(terminal_opts.win)
 
         -- the running terminal instance, so it relayouts without restarting the TUI
-        local terminal = provider:get()
+        local terminal = require("snacks.terminal").get(opencode_cmd, vim.tbl_extend("force", terminal_opts, { create = false }))
         if terminal and terminal:buf_valid() then
           flip(terminal.opts)
           if terminal:valid() then

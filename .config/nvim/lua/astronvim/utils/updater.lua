@@ -176,7 +176,7 @@ function M.update_available(opts)
       check_needed = true
     end
     if check_needed and git.remote_url(remote, false) ~= url then
-      vim.api.nvim_err_writeln("Error setting up remote " .. remote .. " to " .. url)
+      vim.notify("Error setting up remote " .. remote .. " to " .. url, vim.log.levels.ERROR)
       return
     end
   end
@@ -192,7 +192,7 @@ function M.update_available(opts)
   end
   -- fetch the latest remote
   if not git.fetch(opts.remote) then
-    vim.api.nvim_err_writeln("Error fetching remote: " .. opts.remote)
+    vim.notify("Error fetching remote: " .. opts.remote, vim.log.levels.ERROR)
     return
   end
   -- switch to the necessary branch only if not on the stable channel
@@ -209,7 +209,7 @@ function M.update_available(opts)
     end
     -- check if the branch was switched to successfully
     if git.current_branch() ~= local_branch then
-      vim.api.nvim_err_writeln("Error checking out branch: " .. opts.remote .. "/" .. opts.branch)
+      vim.notify("Error checking out branch: " .. opts.remote .. "/" .. opts.branch, vim.log.levels.ERROR)
       return
     end
   end
@@ -218,7 +218,7 @@ function M.update_available(opts)
     local version_search = opts.version or "latest"
     update.version = git.latest_version(git.get_versions(version_search))
     if not update.version then -- continue only if stable version is found
-      vim.api.nvim_err_writeln("Error finding version: " .. version_search)
+      vim.notify("Error finding version: " .. version_search, vim.log.levels.ERROR)
       return
     end
     update.target = git.tag_commit(update.version)
@@ -229,7 +229,7 @@ function M.update_available(opts)
   end
 
   if not update.source or not update.target then -- continue if current and target commits were found
-    vim.api.nvim_err_writeln "Error checking for updates"
+    vim.notify("Error checking for updates", vim.log.levels.ERROR)
     return
   elseif update.source ~= update.target then
     -- update available
@@ -301,7 +301,7 @@ function M.update(opts)
     end
     -- if update was unsuccessful throw an error
     if not updated then
-      vim.api.nvim_err_writeln "Error occurred performing update"
+      vim.notify("Error occurred performing update", vim.log.levels.ERROR)
       return
     end
     -- print a summary of the update with the changelog

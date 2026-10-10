@@ -18,7 +18,7 @@ autocmd("BufReadPre", {
   desc = "Disable certain functionality on very large files",
   group = augroup("large_buf", { clear = true }),
   callback = function(args)
-    local ok, stats = pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(args.buf))
+    local ok, stats = pcall(vim.uv.fs_stat, vim.api.nvim_buf_get_name(args.buf))
     vim.b[args.buf].large_buf = (ok and stats and stats.size > vim.g.max_file.size)
       or vim.api.nvim_buf_line_count(args.buf) > vim.g.max_file.lines
   end,
@@ -149,7 +149,7 @@ autocmd("TextYankPost", {
   desc = "Highlight yanked text",
   group = augroup("highlightyank", { clear = true }),
   pattern = "*",
-  callback = function() vim.highlight.on_yank() end,
+  callback = function() vim.hl.on_yank() end,
 })
 
 autocmd("FileType", {
@@ -285,7 +285,7 @@ if is_available "neo-tree.nvim" then
       if package.loaded["neo-tree"] then
         vim.api.nvim_del_augroup_by_name "neotree_start"
       else
-        local stats = (vim.uv or vim.loop).fs_stat(vim.api.nvim_buf_get_name(0)) -- TODO: REMOVE vim.loop WHEN DROPPING SUPPORT FOR Neovim v0.9
+        local stats = vim.uv.fs_stat(vim.api.nvim_buf_get_name(0))
         if stats and stats.type == "directory" then
           vim.api.nvim_del_augroup_by_name "neotree_start"
           require "neo-tree"

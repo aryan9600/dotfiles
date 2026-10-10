@@ -21,15 +21,22 @@ local extend_tbl = utils.extend_tbl
 
 local server_config = "lsp.config."
 local setup_handlers = user_opts("lsp.setup_handlers", {
-  function(server, opts) require("lspconfig")[server].setup(opts) end,
+  function(server, opts)
+    vim.lsp.config(server, opts)
+    vim.lsp.enable(server)
+  end,
 })
+
+--- names of the language servers that have been set up through `M.setup`
+M.servers = {}
 
 M.diagnostics = { [0] = {}, {}, {}, {} }
 
+---@param signs table<vim.diagnostic.Severity,string> sign text for each diagnostic severity
 M.setup_diagnostics = function(signs)
   local default_diagnostics = astronvim.user_opts("diagnostics", {
     virtual_text = true,
-    signs = { active = signs },
+    signs = { text = signs },
     update_in_insert = true,
     underline = true,
     severity_sort = true,
@@ -37,7 +44,7 @@ M.setup_diagnostics = function(signs)
       focused = false,
       style = "minimal",
       border = "rounded",
-      source = "always",
+      source = true,
       header = "",
       prefix = "",
     },
@@ -77,20 +84,19 @@ end
 --- Helper function to set up a given server with the Neovim LSP client
 ---@param server string The name of the server to be setup
 M.setup = function(server)
-  -- if server doesn't exist, set it up from user server definition
-  local config_avail, config = pcall(require, "lspconfig.server_configurations." .. server)
-  if not config_avail or not config.default_config then
-    local server_definition = user_opts(server_config .. server)
-    if server_definition.cmd then require("lspconfig.configs")[server] = { default_config = server_definition } end
-  end
+  -- servers without a config shipped by nvim-lspconfig (lsp/<server>.lua) can be fully defined by the user
+  -- config file, `vim.lsp.config` merges both so no special handling is needed
   local opts = M.config(server)
   local setup_handler = setup_handlers[server] or setup_handlers[1]
-  if not vim.tbl_contains(astronvim.lsp.skip_setup, server) and setup_handler then setup_handler(server, opts) end
+  if not vim.tbl_contains(astronvim.lsp.skip_setup, server) and setup_handler then
+    setup_handler(server, opts)
+    M.servers[server] = true
+  end
 end
 
 --- Helper function to check if any active LSP clients given a filter provide a specific capability
 ---@param capability string The server capability to check for (example: "documentFormattingProvider")
----@param filter vim.lsp.get_active_clients.filter|nil (table|nil) A table with
+---@param filter vim.lsp.get_clients.Filter|nil (table|nil) A table with
 ---              key-value pairs used to filter the returned clients.
 ---              The available keys are:
 ---               - id (number): Only return clients with the given id
@@ -98,14 +104,14 @@ end
 ---               - name (string): Only return clients with the given name
 ---@return boolean # Whether or not any of the clients provide the capability
 function M.has_capability(capability, filter)
-  for _, client in ipairs(vim.lsp.get_active_clients(filter)) do
-    if client.supports_method(capability) then return true end
+  for _, client in ipairs(vim.lsp.get_clients(filter)) do
+    if client:supports_method(capability, filter and filter.bufnr) then return true end
   end
   return false
 end
 
 local function add_buffer_autocmd(augroup, bufnr, autocmds)
-  if not vim.tbl_islist(autocmds) then autocmds = { autocmds } end
+  if not vim.islist(autocmds) then autocmds = { autocmds } end
   local cmds_found, cmds = pcall(vim.api.nvim_get_autocmds, { group = augroup, buffer = bufnr })
   if not cmds_found or vim.tbl_isempty(cmds) then
     vim.api.nvim_create_augroup(augroup, { clear = false })
@@ -124,6 +130,9 @@ local function del_buffer_autocmd(augroup, bufnr)
   if cmds_found then vim.tbl_map(function(cmd) vim.api.nvim_del_autocmd(cmd.id) end, cmds) end
 end
 
+-- open the diagnostic float after jumping, like the removed `vim.diagnostic.goto_next/prev` did by default
+local function open_jump_float(_, bufnr) vim.diagnostic.open_float { bufnr = bufnr, scope = "cursor", focus = false } end
+
 --- The `on_attach` function used by AstroNvim
 ---@param client table The LSP client details when attaching
 ---@param bufnr number The buffer that the LSP client is attaching to
@@ -131,8 +140,8 @@ M.on_attach = function(client, bufnr)
   local lsp_mappings = require("astronvim.utils").empty_map_table()
 
   lsp_mappings.n["<leader>ld"] = { function() vim.diagnostic.open_float() end, desc = "Hover diagnostics" }
-  lsp_mappings.n["[d"] = { function() vim.diagnostic.goto_prev() end, desc = "Previous diagnostic" }
-  lsp_mappings.n["]d"] = { function() vim.diagnostic.goto_next() end, desc = "Next diagnostic" }
+  lsp_mappings.n["[d"] = { function() vim.diagnostic.jump { count = -1, on_jump = open_jump_float } end, desc = "Previous diagnostic" }
+  lsp_mappings.n["]d"] = { function() vim.diagnostic.jump { count = 1, on_jump = open_jump_float } end, desc = "Next diagnostic" }
   lsp_mappings.n["gl"] = { function() vim.diagnostic.open_float() end, desc = "Hover diagnostics" }
 
   if is_available "telescope.nvim" then
@@ -141,14 +150,15 @@ M.on_attach = function(client, bufnr)
   end
 
   if is_available "mason-lspconfig.nvim" then
-    lsp_mappings.n["<leader>li"] = { "<cmd>LspInfo<cr>", desc = "LSP information" }
+    -- nvim-lspconfig no longer defines :LspInfo on Neovim 0.12, it was an alias for this
+    lsp_mappings.n["<leader>li"] = { "<cmd>checkhealth vim.lsp<cr>", desc = "LSP information" }
   end
 
   if is_available "null-ls.nvim" then
     lsp_mappings.n["<leader>lI"] = { "<cmd>NullLsInfo<cr>", desc = "Null-ls information" }
   end
 
-  if client.supports_method "textDocument/codeAction" then
+  if client:supports_method("textDocument/codeAction", bufnr) then
     lsp_mappings.n["<leader>la"] = {
       function() vim.lsp.buf.code_action() end,
       desc = "LSP code action",
@@ -156,21 +166,14 @@ M.on_attach = function(client, bufnr)
     lsp_mappings.v["<leader>la"] = lsp_mappings.n["<leader>la"]
   end
 
-  if client.supports_method "textDocument/codeLens" then
-    add_buffer_autocmd("lsp_codelens_refresh", bufnr, {
-      events = { "InsertLeave", "BufEnter" },
-      desc = "Refresh codelens",
-      callback = function()
-        if not M.has_capability("textDocument/codeLens", { bufnr = bufnr }) then
-          del_buffer_autocmd("lsp_codelens_refresh", bufnr)
-          return
-        end
-        if vim.g.codelens_enabled then vim.lsp.codelens.refresh() end
-      end,
-    })
-    if vim.g.codelens_enabled then vim.lsp.codelens.refresh() end
+  if client:supports_method("textDocument/codeLens", bufnr) then
+    -- Neovim 0.12 keeps enabled code lenses refreshed itself (replaces the old InsertLeave/BufEnter refresh autocmd)
+    vim.lsp.codelens.enable(vim.g.codelens_enabled, { bufnr = bufnr })
     lsp_mappings.n["<leader>ll"] = {
-      function() vim.lsp.codelens.refresh() end,
+      function()
+        vim.lsp.codelens.enable(false, { bufnr = 0 })
+        vim.lsp.codelens.enable(true, { bufnr = 0 })
+      end,
       desc = "LSP CodeLens refresh",
     }
     lsp_mappings.n["<leader>lL"] = {
@@ -179,21 +182,21 @@ M.on_attach = function(client, bufnr)
     }
   end
 
-  if client.supports_method "textDocument/declaration" then
+  if client:supports_method("textDocument/declaration", bufnr) then
     lsp_mappings.n["gD"] = {
       function() vim.lsp.buf.declaration() end,
       desc = "Declaration of current symbol",
     }
   end
 
-  if client.supports_method "textDocument/definition" then
+  if client:supports_method("textDocument/definition", bufnr) then
     lsp_mappings.n["gd"] = {
       function() vim.lsp.buf.definition() end,
       desc = "Show the definition of current symbol",
     }
   end
 
-  if client.supports_method "textDocument/formatting" and not tbl_contains(M.formatting.disabled, client.name) then
+  if client:supports_method("textDocument/formatting", bufnr) and not tbl_contains(M.formatting.disabled, client.name) then
     lsp_mappings.n["<leader>lf"] = {
       function() vim.lsp.buf.format(M.format_opts) end,
       desc = "Format buffer",
@@ -239,7 +242,7 @@ M.on_attach = function(client, bufnr)
     end
   end
 
-  if client.supports_method "textDocument/documentHighlight" then
+  if client:supports_method("textDocument/documentHighlight", bufnr) then
     add_buffer_autocmd("lsp_document_highlight", bufnr, {
       {
         events = { "CursorHold", "CursorHoldI" },
@@ -260,36 +263,24 @@ M.on_attach = function(client, bufnr)
     })
   end
 
-  if client.supports_method "textDocument/hover" then
-    -- TODO: Remove mapping after dropping support for Neovim v0.9, it's automatic
-    if vim.fn.has "nvim-0.10" == 0 then
-      lsp_mappings.n["K"] = {
-        function() vim.lsp.buf.hover() end,
-        desc = "Hover symbol details",
-      }
-    end
-  end
 
-  if client.supports_method "textDocument/implementation" then
+  if client:supports_method("textDocument/implementation", bufnr) then
     lsp_mappings.n["gI"] = {
       function() vim.lsp.buf.implementation() end,
       desc = "Implementation of current symbol",
     }
   end
 
-  if client.supports_method "textDocument/inlayHint" then
-    if vim.b.inlay_hints_enabled == nil then vim.b.inlay_hints_enabled = vim.g.inlay_hints_enabled end
-    -- TODO: remove check after dropping support for Neovim v0.9
-    if vim.lsp.inlay_hint then
-      if vim.b.inlay_hints_enabled then vim.lsp.inlay_hint(bufnr, true) end
-      lsp_mappings.n["<leader>uH"] = {
-        function() require("astronvim.utils.ui").toggle_buffer_inlay_hints(bufnr) end,
-        desc = "Toggle LSP inlay hints (buffer)",
-      }
-    end
+  if client:supports_method("textDocument/inlayHint", bufnr) then
+    if vim.b[bufnr].inlay_hints_enabled == nil then vim.b[bufnr].inlay_hints_enabled = vim.g.inlay_hints_enabled end
+    if vim.b[bufnr].inlay_hints_enabled then vim.lsp.inlay_hint.enable(true, { bufnr = bufnr }) end
+    lsp_mappings.n["<leader>uH"] = {
+      function() require("astronvim.utils.ui").toggle_buffer_inlay_hints(bufnr) end,
+      desc = "Toggle LSP inlay hints (buffer)",
+    }
   end
 
-  if client.supports_method "textDocument/references" then
+  if client:supports_method("textDocument/references", bufnr) then
     lsp_mappings.n["gr"] = {
       function() vim.lsp.buf.references() end,
       desc = "References of current symbol",
@@ -300,32 +291,32 @@ M.on_attach = function(client, bufnr)
     }
   end
 
-  if client.supports_method "textDocument/rename" then
+  if client:supports_method("textDocument/rename", bufnr) then
     lsp_mappings.n["<leader>lr"] = {
       function() vim.lsp.buf.rename() end,
       desc = "Rename current symbol",
     }
   end
 
-  if client.supports_method "textDocument/signatureHelp" then
+  if client:supports_method("textDocument/signatureHelp", bufnr) then
     lsp_mappings.n["<leader>lh"] = {
       function() vim.lsp.buf.signature_help() end,
       desc = "Signature help",
     }
   end
 
-  if client.supports_method "textDocument/typeDefinition" then
+  if client:supports_method("textDocument/typeDefinition", bufnr) then
     lsp_mappings.n["gy"] = {
       function() vim.lsp.buf.type_definition() end,
       desc = "Definition of current type",
     }
   end
 
-  if client.supports_method "workspace/symbol" then
+  if client:supports_method("workspace/symbol", bufnr) then
     lsp_mappings.n["<leader>lg"] = { function() vim.lsp.buf.workspace_symbol() end, desc = "Search workspace symbols" }
   end
 
-  if client.supports_method "textDocument/semanticTokens/full" and vim.lsp.semantic_tokens then
+  if client:supports_method("textDocument/semanticTokens/full", bufnr) and vim.lsp.semantic_tokens then
     if vim.g.semantic_tokens_enabled then
       vim.b[bufnr].semantic_tokens_enabled = true
       lsp_mappings.n["<leader>uY"] = {
@@ -371,7 +362,7 @@ M.on_attach = function(client, bufnr)
   utils.set_mappings(user_opts("lsp.mappings", lsp_mappings), { buffer = bufnr })
 
   for id, _ in pairs(astronvim.lsp.progress) do -- clear lingering progress messages
-    if not next(vim.lsp.get_active_clients { id = tonumber(id:match "^%d+") }) then astronvim.lsp.progress[id] = nil end
+    if not next(vim.lsp.get_clients { id = tonumber(id:match "^%d+") }) then astronvim.lsp.progress[id] = nil end
   end
 
   local on_attach_override = user_opts("lsp.on_attach", nil, false)
@@ -394,12 +385,65 @@ M.capabilities.textDocument.foldingRange = { dynamicRegistration = false, lineFo
 M.capabilities = user_opts("lsp.capabilities", M.capabilities)
 M.flags = user_opts "lsp.flags"
 
---- Get the server configuration for a given language server to be provided to the server's `setup()` call
+-- The config each server had before AstroNvim touched it (nvim-lspconfig's lsp/<server>.lua merged with any
+-- `vim.lsp.config` calls), cached so re-running `M.setup` (e.g. from :LspStartWithEnv) doesn't wrap twice
+local base_configs = {}
+local function base_config(server_name)
+  if base_configs[server_name] == nil then
+    local ok, config = pcall(function() return vim.lsp.config[server_name] end)
+    base_configs[server_name] = ok and config or false
+  end
+  return base_configs[server_name] or {}
+end
+
+-- call a `vim.lsp.Config` callback field, which can be a function or a list of functions
+local function run_callbacks(callbacks, ...)
+  if type(callbacks) == "function" then callbacks = { callbacks } end
+  for _, callback in ipairs(callbacks or {}) do
+    callback(...)
+  end
+end
+
+local function merge_into(dst, src)
+  for key, value in pairs(src) do
+    if type(value) == "table" and type(dst[key]) == "table" and not vim.islist(value) then
+      merge_into(dst[key], value)
+    else
+      dst[key] = value
+    end
+  end
+end
+
+-- neoconf only hooks nvim-lspconfig's legacy `setup()` framework, so apply its global/local `lspconfig.<server>`
+-- settings (.neoconf.json etc.) here the same way its `on_new_config` hook did
+local function apply_neoconf_settings(config)
+  if not package.loaded["neoconf"] then return end
+  local Config, Settings = require "neoconf.config", require "neoconf.settings"
+  local root_dir = config.root_dir or vim.fn.getcwd()
+  local options = Config.get { file = root_dir }
+  if not options.plugins.lspconfig.enabled then return end
+  root_dir = require("neoconf.workspace").find_root { file = root_dir }
+  local global, root = Settings.get_global(), Settings.get_local(root_dir)
+  for _, settings in ipairs {
+    global:get("lspconfig." .. config.name, { expand = true }) or {},
+    options.import.coc and global:get "coc" or {},
+    options.import.nlsp and global:get("nlsp." .. config.name) or {},
+    options.import.vscode and root:get "vscode" or {},
+    options.import.coc and root:get "coc" or {},
+    options.import.nlsp and root:get("nlsp." .. config.name) or {},
+    root:get("lspconfig." .. config.name, { expand = true }) or {},
+  } do
+    -- merge in place: the client keeps a reference to this exact settings table
+    merge_into(config.settings, settings)
+  end
+end
+
+--- Get the server configuration for a given language server to be passed to `vim.lsp.config()`
 ---@param server_name string The name of the server
 ---@return table # The table of LSP options used when setting up the given language server
 function M.config(server_name)
-  local server = require("lspconfig")[server_name]
-  local lsp_opts = extend_tbl(server, { capabilities = M.capabilities, flags = M.flags })
+  local server = base_config(server_name)
+  local lsp_opts = { capabilities = M.capabilities, flags = M.flags }
   if server_name == "jsonls" then -- by default add json schemas
     local schemastore_avail, schemastore = pcall(require, "schemastore")
     if schemastore_avail then
@@ -410,21 +454,12 @@ function M.config(server_name)
     local schemastore_avail, schemastore = pcall(require, "schemastore")
     if schemastore_avail then lsp_opts.settings = { yaml = { schemas = schemastore.yaml.schemas() } } end
   end
-  if server_name == "lua_ls" then -- by default initialize neodev and disable third party checking
-    pcall(require, "neodev")
-    lsp_opts.before_init = function(param, config)
-      if vim.b.neodev_enabled then
-        for _, astronvim_config in ipairs(astronvim.supported_configs) do
-          if param.rootPath:match(astronvim_config) then
-            table.insert(config.settings.Lua.workspace.library, astronvim.install.home .. "/lua")
-            break
-          end
-        end
-      end
-    end
+  if server_name == "lua_ls" then -- disable third party checking (lazydev.nvim provides the Neovim library)
     lsp_opts.settings = { Lua = { workspace = { checkThirdParty = false } } }
   end
   local opts = user_opts(server_config .. server_name, lsp_opts)
+  -- always have a settings table so neoconf settings can be merged into it in place
+  if not opts.settings and not server.settings then opts.settings = {} end
 
   if vim.g.astronvim_lsp_env then
     local env_string = ""
@@ -432,26 +467,27 @@ function M.config(server_name)
       env_string = env_string .. k .. "='" .. v .. "' "
     end
 
-    local original_cmd_table = opts.cmd
-    if not original_cmd_table then
-      local server_config_ok, server_config_val = pcall(require, "lspconfig.server_configurations." .. server_name)
-      if server_config_ok and server_config_val.default_config and server_config_val.default_config.cmd then
-        original_cmd_table = server_config_val.default_config.cmd
-      end
-    end
-
-    if original_cmd_table then
+    local original_cmd_table = opts.cmd or server.cmd
+    if type(original_cmd_table) == "table" then
       local original_cmd = table.concat(original_cmd_table, " ")
       opts.cmd = { "/bin/sh", "-c", env_string .. original_cmd }
     end
   end
 
+  local old_before_init = server.before_init
+  local user_before_init = opts.before_init
+  opts.before_init = function(params, config)
+    apply_neoconf_settings(config)
+    run_callbacks(old_before_init, params, config)
+    run_callbacks(user_before_init, params, config)
+  end
+
   local old_on_attach = server.on_attach
   local user_on_attach = opts.on_attach
   opts.on_attach = function(client, bufnr)
-    conditional_func(old_on_attach, true, client, bufnr)
+    run_callbacks(old_on_attach, client, bufnr)
     M.on_attach(client, bufnr)
-    conditional_func(user_on_attach, true, client, bufnr)
+    run_callbacks(user_on_attach, client, bufnr)
   end
   return opts
 end

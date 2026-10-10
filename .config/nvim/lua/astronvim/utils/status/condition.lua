@@ -112,8 +112,8 @@ function M.aerial_available() return package.loaded["aerial"] end
 -- @usage local heirline_component = { provider = "Example Provider", condition = require("astronvim.utils.status").condition.lsp_attached }
 function M.lsp_attached(bufnr)
   if type(bufnr) == "table" then bufnr = bufnr.bufnr end
-  -- HACK: Check for lsp utilities loaded first, get_active_clients seems to have a bug if called too early (tokyonight colorscheme seems to be a good way to expose this for some reason)
-  return package.loaded["astronvim.utils.lsp"] and next(vim.lsp.get_active_clients { bufnr = bufnr or 0 }) ~= nil
+  -- HACK: Check for lsp utilities loaded first, get_clients seems to have a bug if called too early (tokyonight colorscheme seems to be a good way to expose this for some reason)
+  return package.loaded["astronvim.utils.lsp"] and next(vim.lsp.get_clients { bufnr = bufnr or 0 }) ~= nil
 end
 
 --- A condition function if treesitter is in use
@@ -121,10 +121,9 @@ end
 ---@return boolean # whether or not treesitter is active
 -- @usage local heirline_component = { provider = "Example Provider", condition = require("astronvim.utils.status").condition.treesitter_available }
 function M.treesitter_available(bufnr)
-  if not package.loaded["nvim-treesitter"] then return false end
   if type(bufnr) == "table" then bufnr = bufnr.bufnr end
-  local parsers = require "nvim-treesitter.parsers"
-  return parsers.has_parser(parsers.get_buf_lang(bufnr or vim.api.nvim_get_current_buf()))
+  if not bufnr or bufnr == 0 then bufnr = vim.api.nvim_get_current_buf() end
+  return vim.treesitter.highlighter.active[bufnr] ~= nil
 end
 
 --- A condition function if the foldcolumn is enabled

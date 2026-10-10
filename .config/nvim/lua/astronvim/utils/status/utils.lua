@@ -187,7 +187,17 @@ function M.statuscolumn_clickargs(self, minwid, clicks, button, mods)
   if not self.signs then self.signs = {} end
   args.char = vim.fn.screenstring(args.mousepos.screenrow, args.mousepos.screencol)
   if args.char == " " then args.char = vim.fn.screenstring(args.mousepos.screenrow, args.mousepos.screencol - 1) end
-  args.sign = self.signs[args.char]
+  -- diagnostic and gitsigns signs are extmarks rather than legacy signs, look those up on the clicked line first
+  local buf = vim.api.nvim_win_get_buf(args.mousepos.winid)
+  local row = args.mousepos.line - 1
+  for _, extmark in ipairs(vim.api.nvim_buf_get_extmarks(buf, -1, { row, 0 }, { row, -1 }, { type = "sign", details = true })) do
+    local details = extmark[4]
+    if details.sign_text and details.sign_text:gsub("%s", "") == args.char then
+      args.sign = { name = details.sign_hl_group, text = details.sign_text, texthl = details.sign_hl_group }
+      break
+    end
+  end
+  if not args.sign then args.sign = self.signs[args.char] end
   if not args.sign then -- update signs if not found on first click
     for _, sign_def in ipairs(vim.fn.sign_getdefined()) do
       if sign_def.text then self.signs[sign_def.text:gsub("%s", "")] = sign_def end

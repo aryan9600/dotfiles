@@ -12,6 +12,7 @@ return {
       changedelete = { text = get_icon "GitSign" },
       untracked = { text = get_icon "GitSign" },
     },
+    signs_staged_enable = false, -- staged hunk signs are new in gitsigns 1.0, keep showing only unstaged changes
     worktrees = vim.g.git_worktrees,
   },
 }

@@ -1,6 +1,6 @@
 return {
   "nvim-lua/plenary.nvim",
-  "echasnovski/mini.bufremove",
+  "nvim-mini/mini.bufremove",
   { "AstroNvim/astrotheme", opts = { plugins = { ["dashboard-nvim"] = true } } },
   { "max397574/better-escape.nvim", event = "InsertCharPre", opts = { timeout = 300 } },
   { "NMAC427/guess-indent.nvim", event = "User AstroFile", config = require "plugins.configs.guess-indent" },
@@ -52,8 +52,10 @@ return {
     "folke/which-key.nvim",
     event = "VeryLazy",
     opts = {
-      icons = { group = vim.g.icons_enabled and "" or "+", separator = "" },
-      disable = { filetypes = { "TelescopePrompt" } },
+      -- which-key v3: keep the v1 look (no per-mapping icons) and popup timing (after 'timeoutlen')
+      delay = function(ctx) return ctx.plugin and 0 or vim.o.timeoutlen end,
+      icons = { group = vim.g.icons_enabled and "" or "+", mappings = false, separator = "" },
+      disable = { ft = { "TelescopePrompt" } },
     },
     config = require "plugins.configs.which-key",
   },

@@ -34,7 +34,7 @@ function M.reload(quiet)
   for _, module in ipairs(core_modules) do
     local status_ok, fault = pcall(require, module)
     if not status_ok then
-      vim.api.nvim_err_writeln("Failed to load " .. module .. "\n\n" .. fault)
+      vim.notify("Failed to load " .. module .. "\n\n" .. fault, vim.log.levels.ERROR)
       success = false
     end
   end
@@ -56,8 +56,8 @@ end
 ---@return any[] # The modified list like table
 function M.list_insert_unique(lst, vals)
   if not lst then lst = {} end
-  assert(vim.tbl_islist(lst), "Provided table is not a list like table")
-  if not vim.tbl_islist(vals) then vals = { vals } end
+  assert(vim.islist(lst), "Provided table is not a list like table")
+  if not vim.islist(vals) then vals = { vals } end
   local added = {}
   vim.tbl_map(function(v) added[v] = true end, lst)
   for _, val in ipairs(vals) do
@@ -112,19 +112,9 @@ end
 ---@return table properties # the highlight group properties
 function M.get_hlgroup(name, fallback)
   if vim.fn.hlexists(name) == 1 then
-    local hl
-    if vim.api.nvim_get_hl then -- check for new neovim 0.9 API
-      hl = vim.api.nvim_get_hl(0, { name = name, link = false })
-      if not hl.fg then hl.fg = "NONE" end
-      if not hl.bg then hl.bg = "NONE" end
-    else
-      hl = vim.api.nvim_get_hl_by_name(name, vim.o.termguicolors)
-      if not hl.foreground then hl.foreground = "NONE" end
-      if not hl.background then hl.background = "NONE" end
-      hl.fg, hl.bg = hl.foreground, hl.background
-      hl.ctermfg, hl.ctermbg = hl.fg, hl.bg
-      hl.sp = hl.special
-    end
+    local hl = vim.api.nvim_get_hl(0, { name = name, link = false })
+    if not hl.fg then hl.fg = "NONE" end
+    if not hl.bg then hl.bg = "NONE" end
     return hl
   end
   return fallback or {}
@@ -258,9 +248,21 @@ function M.which_key_register()
   if M.which_key_queue then
     local wk_avail, wk = pcall(require, "which-key")
     if wk_avail then
+      -- which-key v3 replaced `register` with `add`, which takes a list of specs
+      local specs = {}
       for mode, registration in pairs(M.which_key_queue) do
-        wk.register(registration, { mode = mode })
+        for keymap, opts in pairs(registration) do
+          table.insert(specs, {
+            keymap,
+            group = opts.name,
+            desc = opts.desc,
+            mode = mode,
+            buffer = opts.buffer,
+            hidden = opts.hidden,
+          })
+        end
       end
+      wk.add(specs)
       M.which_key_queue = nil
     end
   end
@@ -273,10 +275,8 @@ function M.empty_map_table()
   for _, mode in ipairs { "", "n", "v", "x", "s", "o", "!", "i", "l", "c", "t" } do
     maps[mode] = {}
   end
-  if vim.fn.has "nvim-0.10.0" == 1 then
-    for _, abbr_mode in ipairs { "ia", "ca", "!a" } do
-      maps[abbr_mode] = {}
-    end
+  for _, abbr_mode in ipairs { "ia", "ca", "!a" } do
+    maps[abbr_mode] = {}
   end
   return maps
 end
@@ -340,7 +340,7 @@ function M.cmd(cmd, show_error)
   local result = vim.fn.system(cmd)
   local success = vim.api.nvim_get_vvar "shell_error" == 0
   if not success and (show_error == nil or show_error) then
-    vim.api.nvim_err_writeln(("Error running command %s\nError message:\n%s"):format(table.concat(cmd, " "), result))
+    vim.notify(("Error running command %s\nError message:\n%s"):format(table.concat(cmd, " "), result), vim.log.levels.ERROR)
   end
   return success and result:gsub("[\27\155][][()#;?%d]*[A-PRZcf-ntqry=><~]", "") or nil
 end

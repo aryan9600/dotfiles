@@ -15,6 +15,14 @@ local utils = require "astronvim.utils"
 local astroevent = utils.event
 local function mason_notify(msg, type) utils.notify(msg, type, { title = "Mason" }) end
 
+--- Check if a newer version of an installed package is available (replaces `Package:check_new_version` from mason v1)
+---@return boolean update_available, string? latest_version
+local function new_version(pkg)
+  local ok, latest = pcall(pkg.get_latest_version, pkg)
+  if not ok then return false end
+  return pkg:get_installed_version() ~= latest, latest
+end
+
 --- Update specified mason packages, or just update the registries if no packages are listed
 ---@param pkg_names? string|string[] The package names as defined in Mason (Not mason-lspconfig or mason-null-ls) if the value is nil then it will just update the registries
 ---@param auto_install? boolean whether or not to install a package that is not currently installed (default: True)
@@ -24,7 +32,7 @@ function M.update(pkg_names, auto_install)
   if auto_install == nil then auto_install = true end
   local registry_avail, registry = pcall(require, "mason-registry")
   if not registry_avail then
-    vim.api.nvim_err_writeln "Unable to access mason registry"
+    vim.notify("Unable to access mason registry", vim.log.levels.ERROR)
     return
   end
 
@@ -47,14 +55,13 @@ function M.update(pkg_names, auto_install)
               mason_notify(("`%s` not installed"):format(pkg.name), vim.log.levels.WARN)
             end
           else
-            pkg:check_new_version(function(update_available, version)
-              if update_available then
-                mason_notify(("Updating `%s` to %s"):format(pkg.name, version.latest_version))
-                pkg:install():on("closed", function() mason_notify(("Updated %s"):format(pkg.name)) end)
-              else
-                mason_notify(("No updates available for `%s`"):format(pkg.name))
-              end
-            end)
+            local update_available, version = new_version(pkg)
+            if update_available then
+              mason_notify(("Updating `%s` to %s"):format(pkg.name, version))
+              pkg:install({}, function() mason_notify(("Updated %s"):format(pkg.name)) end)
+            else
+              mason_notify(("No updates available for `%s`"):format(pkg.name))
+            end
           end
         end
       end
@@ -68,7 +75,7 @@ end
 function M.update_all()
   local registry_avail, registry = pcall(require, "mason-registry")
   if not registry_avail then
-    vim.api.nvim_err_writeln "Unable to access mason registry"
+    vim.notify("Unable to access mason registry", vim.log.levels.ERROR)
     return
   end
 
@@ -85,29 +92,31 @@ function M.update_all()
       else
         local updated = false
         for _, pkg in ipairs(installed_pkgs) do
-          pkg:check_new_version(function(update_available, version)
-            if update_available then
-              updated = true
-              mason_notify(("Updating `%s` to %s"):format(pkg.name, version.latest_version))
-              pkg:install():on("closed", function()
+          local update_available, version = new_version(pkg)
+          if update_available then
+            updated = true
+            mason_notify(("Updating `%s` to %s"):format(pkg.name, version))
+            pkg:install(
+              {},
+              vim.schedule_wrap(function()
                 running = running - 1
                 if running == 0 then
                   mason_notify "Update Complete"
                   astroevent "MasonUpdateCompleted"
                 end
               end)
-            else
-              running = running - 1
-              if running == 0 then
-                if updated then
-                  mason_notify "Update Complete"
-                else
-                  mason_notify "No updates available"
-                end
-                astroevent "MasonUpdateCompleted"
+            )
+          else
+            running = running - 1
+            if running == 0 then
+              if updated then
+                mason_notify "Update Complete"
+              else
+                mason_notify "No updates available"
               end
+              astroevent "MasonUpdateCompleted"
             end
-          end)
+          end
         end
       end
     else
